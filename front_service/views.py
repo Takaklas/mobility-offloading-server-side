@@ -46,9 +46,9 @@ def send_response_concurrent_search(mul,ip,mac):
         # r = requests.get(url, params = {'result':mul}, timeout=1)
         # raise requests.exceptions.ConnectionError
         r = requests.post(url, data = {'result':mul}, timeout=1)
-        print("Response sucessful!")
+        print("Response successful!")
     except requests.exceptions.ConnectionError:
-        print("Oh shit...must find that mofo")
+        print("Client moved to another server!Searching...")
         Found = False
         server_ips = ['10.0.0.1','10.0.0.2']
         urls = ["http://" + ip + ":8000/back/request" for ip in server_ips]
@@ -60,7 +60,7 @@ def send_response_concurrent_search(mul,ip,mac):
                     result = specific_request.get(url)                     
                     # r = specific_request.post(url)
                     if result == 200:
-                        print('mofo found at {}!'.format(ip))
+                        print('Client found at {}!'.format(ip))
                         Found = True
                         break
             else:
@@ -71,7 +71,7 @@ def send_response_concurrent_search(mul,ip,mac):
                     results = pool.map(specific_request.get, urls)
                 for server_ip, result in zip(server_ips,results):
                     if result == 200:
-                        print('mofo found at {}!'.format(server_ip))
+                        print('Client found at {}!'.format(server_ip))
                         Found = True
                         break
 

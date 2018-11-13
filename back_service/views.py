@@ -33,14 +33,17 @@ def request_server(request):
         result = request.POST['result']
     sender_ip = get_sender_ip(request)
     client_ip = get_ip_from_mac(mac)
+    if client_ip == None: 
+        print("Client is not connected to this server")
+        return HttpResponse(status=404)
     url = "http://" + client_ip + ":8088"
     mul = result
     try:
         print("Responding to ip {} who came from {}".format(client_ip, sender_ip))
         # r = requests.get(url, params = {'result':mul}, timeout=1)
         r = requests.post(url, data = {'result':mul}, timeout=1)
-        print("Response sucessful!")
+        print("Response successful!")
         return HttpResponse(status=200)
     except requests.exceptions.ConnectionError:
-        print("Oh shit...he is not here")
+        print("Client is not connected to this server")
         return HttpResponse(status=404)
