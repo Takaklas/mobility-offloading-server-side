@@ -3,6 +3,7 @@ from django.shortcuts import render
 # Create your views here.
 
 from django.http import HttpResponse
+from back_service.models import Client_ip_mac
 
 import threading
 from multiprocessing.dummy import Pool as ThreadPool 
@@ -42,11 +43,11 @@ class requests_wrapper:
 def send_response_concurrent_search(mul,ip,mac):
     url = "http://" + ip + ":8088"
     try:
-        print("Responding:")
+        print("Responding to {}".format(mac))
         # r = requests.get(url, params = {'result':mul}, timeout=1)
         # raise requests.exceptions.ConnectionError
         r = requests.post(url, data = {'result':mul}, timeout=1)
-        print("Response successful!")
+        print("Response to {} successful!".format(mac))
     except requests.exceptions.ConnectionError:
         print("Client moved to another server!Searching...")
         Found = False
@@ -75,18 +76,72 @@ def send_response_concurrent_search(mul,ip,mac):
                         Found = True
                         break
 
+def send_response_read_from_db(data,mac):
+    current_client = Client_ip_mac.objects.get(client_mac = mac)
+    client_ip = current_client.client_ip
+    is_local = current_client.is_local
+    print("Responding to  IP: {}, Mac: {}".format(client_ip,mac))
+    if is_local:
+        url = "http://" + client_ip + ":8088"    
+        try:
+            print("Client {} is local,responding from this server".format(mac))
+            # r = requests.get(url, params = {'result':mul}, timeout=1)
+            # raise requests.exceptions.ConnectionError
+            r = requests.post(url, data=data, timeout=1)
+            print("Response to {} successful!".format(mac))
+        except requests.exceptions.ConnectionError:
+            print("Client moved to another server!Searching...")
+    else:
+        print("Client {} is not local, forwarding response to server {} ...".format(mac,client_ip))
+        url = "http://" + client_ip + ":8000/front/forward"
+        data['mac'] = mac 
+        r = requests.get(url, params=data, timeout=1) 
+        if r.status_code==200:
+            print("Forwarding response to server {} successful!".format(client_ip))
+
 def task(num1,num2,ip,mac):
     time.sleep(5)
     mul = int(num1)*int(num2)
-    send_response_concurrent_search(mul,ip,mac)
+    #send_response_concurrent_search(mul,ip,mac)
+    data = {'result':mul}
+    send_response_read_from_db(data,mac)
 
 def index(request):
     return HttpResponse("Hello, world. You're at the polls index.")
 
+def forward_response(request):
+    server_ip = get_client_ip(request)
+    if request.method == 'GET':
+        mac = request.GET['mac']
+        result = request.GET['result']
+    if request.method == 'POST':
+        mac = request.POST['mac']
+        result = request.POST['result']
+    current_client = Client_ip_mac.objects.get(client_mac = mac)
+    client_ip = current_client.client_ip
+    is_local = current_client.is_local
+    print("Forwardind response from {} to  IP: {}, Mac: {}".format(server_ip,client_ip,mac))
+    if is_local:
+        url = "http://" + client_ip + ":8088"    
+        try:
+            print("Responding to {}".format(mac))
+            # r = requests.get(url, params = {'result':mul}, timeout=1)
+            # raise requests.exceptions.ConnectionError
+            data = {'result':result}
+            r = requests.post(url, data=data, timeout=1)
+            print("Response to {} successful!".format(mac))
+            return HttpResponse(status=200)
+        except requests.exceptions.ConnectionError:
+            print("Client moved to another server!Searching...")
+    else:
+        url = "http://" + client_ip + ":8000/front/forward"
+        data = {'result':result, 'mac':mac}
+        r = requests.post(url, data=data, timeout=1)
+
 def request_server(request):
     ip = get_client_ip(request)
     mac = get_mac_from_ip(ip)
-    print("IP: {}, MAC: {}".format(ip,mac))
+    print("Request from IP: {}, MAC: {}".format(ip,mac))
     if request.method == 'GET':
         number1 = request.GET['num1']
         number2 = request.GET['num2']

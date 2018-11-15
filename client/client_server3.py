@@ -1,6 +1,12 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs
+from sys import version as python_version
 import cgi
+
+if python_version.startswith('3'):
+    from urllib.parse import parse_qs
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+else:
+    from urlparse import parse_qs
+    from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 class GP(BaseHTTPRequestHandler):
     def _set_headers(self):
@@ -31,4 +37,4 @@ def run(server_class=HTTPServer, handler_class=GP, port=8088):
     # httpd.serve_forever()
     httpd.handle_request()
 
-# run()
+#run()
