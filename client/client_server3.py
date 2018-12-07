@@ -27,14 +27,31 @@ class GP(BaseHTTPRequestHandler):
             headers=self.headers,
             environ={'REQUEST_METHOD': 'POST'}
         )
-        print(form.getvalue("result"))
+        #print(form)
+        #print(len(form))
+        for field in form.list:
+            print(field.name+" : "+field.value)
+        #print(form.getvalue("result"))
+        #print(form.getvalue("field"))
         #self.wfile.write("<html><body><h1>POST Request Received!</h1></body></html>")
+
+httpd = None
 
 def run(server_class=HTTPServer, handler_class=GP, port=8088):
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
     print('Server running at localhost:8088...')
-    # httpd.serve_forever()
     httpd.handle_request()
 
-#run()
+def run_forever(server_class=HTTPServer, handler_class=GP, port=8088):
+    server_address = ('', port)
+    httpd = server_class(server_address, handler_class)
+    print('Server running at localhost:8088...')
+    httpd.serve_forever()
+
+def stop():
+    httpd.shutdown()
+
+if __name__ == "__main__":
+    run_forever()
+    #run()

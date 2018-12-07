@@ -32,4 +32,4 @@ def run(server_class=HTTPServer, handler_class=GP, port=8088):
     # httpd.serve_forever()
     httpd.handle_request()
 
-# run()
+run()

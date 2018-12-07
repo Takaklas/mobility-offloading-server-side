@@ -1,1 +1,3 @@
+#link h1 s2 up
+#link h2 s2 down
 h1 curl 'http://0.0.0.0:8000/back/notify?mac=00:00:00:00:00:03&ip=11.0.0.3'

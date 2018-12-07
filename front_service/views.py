@@ -3,12 +3,15 @@ from django.shortcuts import render
 # Create your views here.
 
 from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 from back_service.models import Client_ip_mac
 
 import threading
 from multiprocessing.dummy import Pool as ThreadPool 
 import requests
 import time
+import os
+from front_service.tasks import classify
 
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -27,6 +30,22 @@ def get_mac_from_ip(ip):
             line = line.split()
             if line[0]==ip:
                 return line[3]
+
+def gen_password( temp=8, charset="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()"):
+        random_bytes = os.urandom(8)
+        len_charset = len(charset)
+        indices = [int(len_charset * (byte / 256.0)) for byte in random_bytes]
+        return "".join([charset[index] for index in indices])
+
+def handle_uploaded_file(src_img):
+    dirr = os.getcwd()
+    filename = os.path.join(dirr, '')
+    dest_img = filename + gen_password() + src_img.name
+
+    with open(dest_img, 'wb+') as dest:
+        for c in src_img.chunks():
+            dest.write(c)
+    return dest_img
 
 class requests_wrapper:
     def __init__(self, params={}, timeout=1):
@@ -77,6 +96,7 @@ def send_response_concurrent_search(mul,ip,mac):
                         break
 
 def send_response_read_from_db(data,mac):
+    if mac==None: return requests.post("http://127.0.0.1:8088", data=data, timeout=1)
     current_client = Client_ip_mac.objects.get(client_mac = mac)
     client_ip = current_client.client_ip
     is_local = current_client.is_local
@@ -85,7 +105,8 @@ def send_response_read_from_db(data,mac):
         url = "http://" + client_ip + ":8088"    
         try:
             print("Client {} is local,responding from this server".format(mac))
-            # r = requests.get(url, params = {'result':mul}, timeout=1)
+            # data['random']=1
+            # r = requests.get(url, params = data, timeout=1)
             # raise requests.exceptions.ConnectionError
             r = requests.post(url, data=data, timeout=1)
             print("Response to {} successful!".format(mac))
@@ -96,27 +117,39 @@ def send_response_read_from_db(data,mac):
         url = "http://" + client_ip + ":8000/front/forward"
         data['mac'] = mac 
         r = requests.get(url, params=data, timeout=1) 
+        # r = requests.post(url, data=data, timeout=1)
         if r.status_code==200:
             print("Forwarding response to server {} successful!".format(client_ip))
 
-def task(num1,num2,ip,mac):
-    time.sleep(5)
+def multiply_task(params,ip,mac):
+    #time.sleep(5)
+    num1 = params['num1']
+    num2 = params['num2']
     mul = int(num1)*int(num2)
     #send_response_concurrent_search(mul,ip,mac)
     data = {'result':mul}
     send_response_read_from_db(data,mac)
 
+def image_process_task(params,img,img_name,ip,mac):
+    #time.sleep(5)
+    size = params['size']
+    start_time = params['start_time']
+    #preds = classify.local_classify(image)
+    preds = classify.remote_classify(size,start_time,img,img_name)
+    data = preds
+    send_response_read_from_db(data,mac)
+
 def index(request):
     return HttpResponse("Hello, world. You're at the polls index.")
 
+@csrf_exempt
 def forward_response(request):
     server_ip = get_client_ip(request)
     if request.method == 'GET':
-        mac = request.GET['mac']
-        result = request.GET['result']
+        data = request.GET.dict()
     if request.method == 'POST':
-        mac = request.POST['mac']
-        result = request.POST['result']
+        data = request.POST.dict()
+    mac = data.pop("mac")
     current_client = Client_ip_mac.objects.get(client_mac = mac)
     client_ip = current_client.client_ip
     is_local = current_client.is_local
@@ -127,7 +160,6 @@ def forward_response(request):
             print("Responding to {}".format(mac))
             # r = requests.get(url, params = {'result':mul}, timeout=1)
             # raise requests.exceptions.ConnectionError
-            data = {'result':result}
             r = requests.post(url, data=data, timeout=1)
             print("Response to {} successful!".format(mac))
             return HttpResponse(status=200)
@@ -135,23 +167,47 @@ def forward_response(request):
             print("Client moved to another server!Searching...")
     else:
         url = "http://" + client_ip + ":8000/front/forward"
-        data = {'result':result, 'mac':mac}
+        data['mac'] = mac
         r = requests.post(url, data=data, timeout=1)
 
+@csrf_exempt
 def request_server(request):
     ip = get_client_ip(request)
     mac = get_mac_from_ip(ip)
     print("Request from IP: {}, MAC: {}".format(ip,mac))
     if request.method == 'GET':
-        number1 = request.GET['num1']
-        number2 = request.GET['num2']
+        print(dict(request.GET))
+        print(request.GET.dict())
+        data = request.GET.dict()
     if request.method == 'POST':
-        number1 = request.POST['num1']
-        number2 = request.POST['num2']
-    t = threading.Thread(target=task, args=(number1,number2,ip,mac,))
+        data = request.POST.dict()
+        print(request.FILES)
+    t = threading.Thread(target=multiply_task, args=(data,ip,mac,))
     # We want the program to wait on this thread before shutting down.
     t.deamon = False
     t.start()
     #time.sleep(5)
+    return HttpResponse(status=202)
+
+@csrf_exempt
+def image_upload(request):
+    ip = get_client_ip(request)
+    mac = get_mac_from_ip(ip)
+    print("Request from IP: {}, MAC: {}".format(ip,mac))
+    if request.method == 'GET':
+        data = request.GET.dict()
+    if request.method == 'POST':
+        data = request.POST.dict()
+        image = request.FILES['file']
+        print(request.FILES)
+        #if image.multiple_chunks(): print(image.temporary_file_path())
+        img = handle_uploaded_file(image)
+        img_name = image.name
+    t = threading.Thread(target=image_process_task, args=(data,img,img_name,ip,mac,))
+    # We want the program to wait on this thread before shutting down.
+    t.deamon = False
+    t.start()
+    #time.sleep(5)
+    print("END")
     return HttpResponse(status=202)
 

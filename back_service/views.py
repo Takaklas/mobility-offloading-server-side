@@ -63,10 +63,16 @@ class requests_wrapper:
         self.data = params
         self.timeout = timeout
     def get(self,url):  
-        r = requests.get(url, params = self.params, timeout = self.timeout) 
+        try:
+            r = requests.get(url, params = self.params, timeout = self.timeout) 
+        except requests.exceptions.ConnectionError:
+            return 404
         return r.status_code
     def post(self,url):
-        r = requests.post(url, data = self.data, timeout = self.timeout)  
+        try:
+            r = requests.post(url, data = self.data, timeout = self.timeout)  
+        except requests.exceptions.ConnectionError:
+            return 404
         return r.status_code
 
 def notify_other_servers(mac,ip):
@@ -83,7 +89,6 @@ def notify_other_servers(mac,ip):
             print("Server with ip %s did not get notified!" % server)
 
 def notify_connection(request):
-    print(request.content_params)
     if request.method == 'GET':
         client_mac = request.GET['mac']
         client_ip = request.GET['ip']
@@ -91,7 +96,7 @@ def notify_connection(request):
         client_mac = request.POST['mac']
         client_ip = request.POST['ip']
     sender_ip = get_sender_ip(request)
-    print("Coming from ip %s" % sender_ip)
+    print("New client connected, coming from ip %s" % sender_ip)
     if sender_ip == "127.0.0.1":
         is_local=True
         notify_other_servers(client_mac,client_ip)
@@ -102,10 +107,10 @@ def notify_connection(request):
     else:
         is_local=False
         client_ip = sender_ip
-    print("Mac: {}, IP: {}, Local: {}".format(client_mac,client_ip,is_local))
+    print("Mac: {}, IP: {}, Local: {}\n".format(client_mac,client_ip,is_local))
     client = Client_ip_mac(client_mac = client_mac, client_ip = client_ip, is_local = is_local)
     client.save()
-    current_client = Client_ip_mac.objects.get(client_mac = client_mac)
-    print("Mac: {}, IP: {}".format(current_client.client_mac,current_client.client_ip))
+    #current_client = Client_ip_mac.objects.get(client_mac = client_mac)
+    #print("Mac: {}, IP: {}".format(current_client.client_mac,current_client.client_ip))
   
     return HttpResponse(status=200)  
