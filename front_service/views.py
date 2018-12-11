@@ -5,6 +5,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from back_service.models import Client_ip_mac
+import configuration
 
 import threading
 from multiprocessing.dummy import Pool as ThreadPool 
@@ -46,6 +47,12 @@ def handle_uploaded_file(src_img):
         for c in src_img.chunks():
             dest.write(c)
     return dest_img
+
+def delete_uploaded_file(image):
+    if os.path.isfile(image):
+        os.remove(image)
+    else:
+        print("Error: temp file not found")
 
 class requests_wrapper:
     def __init__(self, params={}, timeout=1):
@@ -134,8 +141,11 @@ def image_process_task(params,img,img_name,ip,mac):
     #time.sleep(5)
     size = params['size']
     start_time = params['start_time']
-    #preds = classify.local_classify(image)
-    preds = classify.remote_classify(size,start_time,img,img_name)
+    if configuration.local_classify:
+        preds = classify.local_classify(img)
+    else:
+        preds = classify.remote_classify(size,start_time,img,img_name)
+    delete_uploaded_file(img)
     data = preds
     send_response_read_from_db(data,mac)
 

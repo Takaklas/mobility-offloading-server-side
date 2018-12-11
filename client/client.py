@@ -86,7 +86,7 @@ if __name__ == "__main__":
         ip = get_ip()
         split_ip = ip.split('.')
         server_ip = split_ip[0] + '.' + split_ip[1] + '.' + split_ip[2] + '.1'
-        server_ip = '192.168.1.1' # '11.0.0.1' 
+        #server_ip = '192.168.1.1' # '11.0.0.1' 
         # r = send_multiply_request(server_ip,i,7)
         r = send_image_request(server_ip,random.choice(images))
         # r.raise_for_status()

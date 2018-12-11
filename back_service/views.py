@@ -4,6 +4,7 @@ from django.shortcuts import render
 
 from django.http import HttpResponse
 from back_service.models import Client_ip_mac
+import configuration
 
 from multiprocessing.dummy import Pool as ThreadPool 
 import threading
@@ -76,7 +77,8 @@ class requests_wrapper:
         return r.status_code
 
 def notify_other_servers(mac,ip):
-    server_ips = ['10.0.0.1','10.0.0.2']
+    #server_ips = ['10.0.0.1','10.0.0.2']
+    server_ips = configuration.server_ips
     this_server_ip = get_server_ip()
     urls = ["http://" + ip + ":8000/back/notify" for ip in server_ips if ip!=this_server_ip]
     specific_request = requests_wrapper(params = {'mac':mac, 'ip':ip}, timeout=10)
