@@ -1,0 +1,7 @@
+virtualenv
+Django
+requests
+tensorflow
+djangorestframework
+celery
+
