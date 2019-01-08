@@ -13,8 +13,6 @@ def local_classify(img):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     # Read in the image_data
-    # image_data = tf.gfile.FastGFile("../images/" + img, 'rb').read()
-    
     image_data = tf.gfile.FastGFile(img, 'rb').read()
 
     # image_data = img.read()

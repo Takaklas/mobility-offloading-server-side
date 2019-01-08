@@ -1,5 +1,6 @@
 from sys import version as python_version
 import cgi
+import threading
 
 if python_version.startswith('3'):
     from urllib.parse import parse_qs
@@ -35,23 +36,40 @@ class GP(BaseHTTPRequestHandler):
         #print(form.getvalue("field"))
         #self.wfile.write("<html><body><h1>POST Request Received!</h1></body></html>")
 
-httpd = None
-
-def run(server_class=HTTPServer, handler_class=GP, port=8088):
-    server_address = ('', port)
-    httpd = server_class(server_address, handler_class)
-    print('Server running at localhost:8088...')
-    httpd.handle_request()
-
-def run_forever(server_class=HTTPServer, handler_class=GP, port=8088):
-    server_address = ('', port)
-    httpd = server_class(server_address, handler_class)
-    print('Server running at localhost:8088...')
-    httpd.serve_forever()
-
-def stop():
-    httpd.shutdown()
+class http_server:
+    def __init__(self, server_class=HTTPServer, handler_class=GP, port=8088):
+        server_address = ('', port)
+        self.httpd = server_class(server_address, handler_class)
+        print('Server running at localhost:8088...')
+        self.pending_requests = 0
+        self.completed_requests = 0
+    def run(self):
+        while self.pending_requests != 0:
+            self.httpd.handle_request()
+            self.pending_requests -= 1
+            self.completed_requests += 1
+    def run_forever(self):
+        self.httpd.serve_forever()
+    def threaded_server(self):
+        t = threading.Thread(target=self.httpd.serve_forever)
+        t.deamon = False
+        t.start()
+    def stop(self):
+        self.httpd.shutdown()
+    def increase_pending_requests_by_one(self):
+        self.pending_requests += 1
+        if self.pending_requests == 1:
+            t = threading.Thread(target=self.run)
+            t.start()
+    def get_pending_requests(self):
+        return self.pending_requests
+    def has_pending_requests(self):
+        return self.pending_requests != 0
+    def get_completed_requests(self):
+        return self.completed_requests
 
 if __name__ == "__main__":
-    run_forever()
-    #run()
+    server = http_server()
+    server.increase_pending_requests_by_one()
+    #server.threaded_server()
+    server.stop()

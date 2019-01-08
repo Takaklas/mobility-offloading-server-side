@@ -3,4 +3,6 @@ h2 ifconfig h2-eth1 11.2
 h3 ifconfig h3-eth0 11.3
 h1 ping -c 1 11.3
 h2 ping -c 1 11.3
+h1 cd ../
+h2 cd ../../
 xterm h1 h2 h3
